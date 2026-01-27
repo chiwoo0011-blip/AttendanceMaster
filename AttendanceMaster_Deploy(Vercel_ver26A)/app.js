@@ -3,7 +3,7 @@ const WORKERS_KEY = 'worker_list';
 
 // --- 실제 배포된 인터넷 주소를 여기에 적으세요 (예: https://my-app.github.io) ---
 // 이 주소가 없으면 직원들이 링크를 눌러도 접속할 수 없습니다.
-const GLOBAL_URL = "https://attendance-master-ten.vercel.app";
+const GLOBAL_URL = "https://attendance-master-3138.vercel.app";
 
 // --- 서버 설정 (Firebase 연동용) ---
 // 실제 사용 시 Firebase 설정을 여기에 붙여넣으세요.
@@ -870,3 +870,4 @@ const AutoBackupSystem = {
 function isMobile() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
+
