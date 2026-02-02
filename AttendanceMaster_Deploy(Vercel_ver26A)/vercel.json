@@ -1,7 +1,4 @@
 ﻿{
-    "version": 2,
-    "name": "attendance-master",
     "cleanUrls": true,
-    "trailingSlash": false,
-    "framework": null
+    "trailingSlash": false
 }
