@@ -3,7 +3,7 @@ const WORKERS_KEY = 'worker_list';
 
 // --- 실제 배포된 인터넷 주소를 여기에 적으세요 (예: https://my-app.github.io) ---
 // 이 주소가 없으면 직원들이 링크를 눌러도 접속할 수 없습니다.
-const GLOBAL_URL = "https://attendance-master-3138.vercel.app";
+const GLOBAL_URL = "https://attendance-master-ten.vercel.app";
 
 // --- 서버 설정 (Firebase 연동용) ---
 // 실제 사용 시 Firebase 설정을 여기에 붙여넣으세요.
@@ -67,6 +67,20 @@ const AttendanceDB = {
 
     saveWorker: async (worker) => {
         const workers = AttendanceDB.getWorkers();
+
+        // 중복 체크 (이름 + 전화번호)
+        const phoneDigits = worker.phone.replace(/[^0-9]/g, ''); // 숫자만 추출
+
+        const isDuplicate = workers.some(w => {
+            if (w.name !== worker.name) return false;
+            const existingPhone = w.phone.replace(/[^0-9]/g, '');
+            return existingPhone === phoneDigits;
+        });
+
+        if (isDuplicate) {
+            throw new Error(`'${worker.name}'님은 이미 등록된 인원입니다.\n전화번호: ${worker.phone}\n\n중복 등록할 수 없습니다.`);
+        }
+
         workers.push({ ...worker, id: Date.now() + Math.random() });
         localStorage.setItem(WORKERS_KEY, JSON.stringify(workers));
 
@@ -157,11 +171,34 @@ const AttendanceDB = {
     },
 
     savePendingWorker: async (worker) => {
-        const pending = AttendanceDB.getPendingWorkers();
-        // 중복 신청 방지 (이름+전화번호)
-        const exists = pending.find(p => p.name === worker.name && p.phone === worker.phone);
-        if (exists) throw new Error('이미 신청된 내역이 있습니다.');
+        // 1. 기존 등록된 인원과 중복 체크 (이름 + 전화번호)
+        const existingWorkers = AttendanceDB.getWorkers();
+        const phoneDigits = worker.phone.replace(/[^0-9]/g, ''); // 숫자만 추출
 
+        const isDuplicateWorker = existingWorkers.some(w => {
+            if (w.name !== worker.name) return false;
+            const existingPhone = w.phone.replace(/[^0-9]/g, '');
+            return existingPhone === phoneDigits;
+        });
+
+        if (isDuplicateWorker) {
+            throw new Error(`'${worker.name}'님은 이미 등록된 인원입니다.\n전화번호: ${worker.phone}\n\n관리자에게 문의하세요.`);
+        }
+
+        // 2. 승인 대기 중인 인원과 중복 체크 (이름 + 전화번호)
+        const pending = AttendanceDB.getPendingWorkers();
+
+        const isDuplicatePending = pending.some(p => {
+            if (p.name !== worker.name) return false;
+            const pendingPhone = p.phone.replace(/[^0-9]/g, '');
+            return pendingPhone === phoneDigits;
+        });
+
+        if (isDuplicatePending) {
+            throw new Error(`'${worker.name}'님은 이미 등록 신청을 하셨습니다.\n전화번호: ${worker.phone}\n\n관리자 승인을 기다려주세요.`);
+        }
+
+        // 3. 중복이 없으면 저장
         const newWorker = { ...worker, id: Date.now() + Math.random(), timestamp: new Date().toISOString() };
         pending.push(newWorker);
         localStorage.setItem('pending_workers', JSON.stringify(pending));
@@ -842,20 +879,12 @@ const AutoBackupSystem = {
                 notice: localStorage.getItem('app_notice')
             };
 
-            // 3. 로컬 데이터 클리어 (출근 기록만 날림)
-            localStorage.clear();
+            // 3. 로컬 데이터 초기화 (출근 기록만 날림)
+            // localStorage.clear()는 모든 설정을 날려버리므로 위험합니다.
+            // 대신 출근 기록 키만 삭제합니다.
+            localStorage.removeItem(DB_KEY);
 
-            // 4. 중요 데이터 복원 및 회기 설정
-            if (workers) localStorage.setItem(WORKERS_KEY, workers);
-            if (settings.pw) localStorage.setItem('admin_password', settings.pw);
-            if (settings.title) localStorage.setItem('app_title', settings.title);
-            if (settings.logo) localStorage.setItem('app_logo', settings.logo);
-            if (settings.logout) localStorage.setItem('auto_logout_time', settings.logout);
-            if (settings.deadline) localStorage.setItem('submission_deadline', settings.deadline);
-            if (settings.vacations) localStorage.setItem('vacation_settings', settings.vacations);
-            if (settings.vacationWork) localStorage.setItem('vacation_working_days', settings.vacationWork);
-            if (settings.notice) localStorage.setItem('app_notice', settings.notice);
-
+            // 4. 회기 설정 갱신
             localStorage.setItem('current_fiscal_year', FiscalYearUtil.getCurrentYear());
             localStorage.setItem('last_backup_check_date', new Date().toISOString().split('T')[0]);
 
