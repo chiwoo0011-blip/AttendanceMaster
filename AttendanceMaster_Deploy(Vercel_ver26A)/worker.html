@@ -115,14 +115,17 @@
         <main class="glass fade-in" style="padding: 1.5rem;">
             <!-- 1. 성명 입력 및 정보 카드 표시 -->
             <div class="input-group">
-                <label for="workerName">성명 입력</label>
+                <label for="workerName">정보 입력</label>
                 <div style="display: flex; gap: 0.5rem;">
-                    <input type="text" id="workerName" placeholder="성명" style="flex: 1;"
-                        onkeydown="if(event.key === 'Enter') document.getElementById('workerPhoneBack').focus()">
-                    <input type="text" id="workerPhoneBack" placeholder="휴대폰 뒷 4자리" maxlength="4" style="width: 140px;"
-                        oninput="this.value = this.value.replace(/[^0-9]/g, '')"
-                        onkeydown="if(event.key === 'Enter') fetchWorkerInfo()">
-                    <button class="btn btn-primary" onclick="fetchWorkerInfo()" style="white-space: nowrap;">
+                    <div style="flex: 7; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <input type="text" id="workerName" placeholder="성명"
+                            onkeydown="if(event.key === 'Enter') document.getElementById('workerPhoneBack').focus()">
+                        <input type="text" id="workerPhoneBack" placeholder="휴대폰 뒷 4자리" maxlength="4"
+                            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                            onkeydown="if(event.key === 'Enter') fetchWorkerInfo()">
+                    </div>
+                    <button class="btn btn-primary" onclick="fetchWorkerInfo()"
+                        style="flex: 3; white-space: nowrap; display: flex; align-items: center; justify-content: center;">
                         <i data-lucide="search"></i> 조회
                     </button>
                 </div>
@@ -137,50 +140,60 @@
                 <div id="workerInfoArea"></div>
             </div>
 
-            <!-- 2. 월 선택 -->
-            <div class="input-group">
-                <label for="workMonth">근무 월 선택</label>
-                <input type="month" id="workMonth" onchange="renderWorkerCalendar()">
-            </div>
+            <!-- 출근 입력 버튼 -->
+            <button class="btn btn-primary" id="toggleAttendanceBtn" onclick="toggleAttendanceSection()"
+                style="width: 100%; margin-top: 1.5rem; height: 55px; font-size: 1.1rem; font-weight: 800; display: none;">
+                <i data-lucide="calendar-plus"></i> 출근 입력하기
+            </button>
 
-            <!-- 3. 일괄 선택 버튼 -->
-            <div class="bulk-actions">
-                <button class="btn btn-secondary btn-sm" onclick="selectWeekdays()" style="flex: 1;">
-                    <i data-lucide="check-square"></i> 근무일 전체 선택
-                </button>
-                <button class="btn btn-secondary btn-sm" onclick="clearSelection()" style="flex: 1;">
-                    <i data-lucide="rotate-ccw"></i> 초기화
-                </button>
-            </div>
+            <!-- 출근 입력 섹션 (기본 숨김) -->
+            <div id="attendanceSection" style="display: none;">
 
-            <!-- 4. 달력 영역 -->
-            <div class="w-calendar-container">
-                <div id="w_calendar_grid_v1_7" class="w-calendar-grid">
-                    <!-- 요일 헤더와 날짜가 생성됨 -->
+                <!-- 2. 월 선택 -->
+                <div class="input-group">
+                    <label for="workMonth">근무 월 선택</label>
+                    <input type="month" id="workMonth" onchange="renderWorkerCalendar()">
                 </div>
-            </div>
 
-            <p id="selectedCount"
-                style="font-size: 0.9rem; color: var(--primary); font-weight: 700; text-align: right;">
-                선택된 날짜: 0일
-            </p>
-
-            <div class="input-group" style="margin-top: 1.5rem;">
-                <label>서명란</label>
-                <div style="position: relative;">
-                    <canvas id="signaturePad" class="signature-pad"
-                        style="border: 1px solid var(--border); background: white; border-radius: 8px; width: 100%; height: 180px;"></canvas>
-                    <button class="btn btn-secondary" id="clearBtn"
-                        style="position: absolute; bottom: 10px; right: 10px; padding: 0.5rem; font-size: 0.75rem;">
-                        <i data-lucide="eraser"></i> 지우기
+                <!-- 3. 일괄 선택 버튼 -->
+                <div class="bulk-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="selectWeekdays()" style="flex: 1;">
+                        <i data-lucide="check-square"></i> 근무일 전체 선택
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="clearSelection()" style="flex: 1;">
+                        <i data-lucide="rotate-ccw"></i> 초기화
                     </button>
                 </div>
-            </div>
 
-            <button class="btn btn-primary" id="submitBtn"
-                style="width: 100%; margin-top: 1.5rem; height: 55px; font-size: 1.1rem; font-weight: 800;">
-                <i data-lucide="send"></i> 출근 기록 전송 및 승인 요청
-            </button>
+                <!-- 4. 달력 영역 -->
+                <div class="w-calendar-container">
+                    <div id="w_calendar_grid_v1_7" class="w-calendar-grid">
+                        <!-- 요일 헤더와 날짜가 생성됨 -->
+                    </div>
+                </div>
+
+                <p id="selectedCount"
+                    style="font-size: 0.9rem; color: var(--primary); font-weight: 700; text-align: right;">
+                    선택된 날짜: 0일
+                </p>
+
+                <div class="input-group" style="margin-top: 1.5rem;">
+                    <label>서명란</label>
+                    <div style="position: relative;">
+                        <canvas id="signaturePad" class="signature-pad"
+                            style="border: 1px solid var(--border); background: white; border-radius: 8px; width: 100%; height: 180px;"></canvas>
+                        <button class="btn btn-secondary" id="clearBtn"
+                            style="position: absolute; bottom: 10px; right: 10px; padding: 0.5rem; font-size: 0.75rem;">
+                            <i data-lucide="eraser"></i> 지우기
+                        </button>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="submitBtn"
+                    style="width: 100%; margin-top: 1.5rem; height: 55px; font-size: 1.1rem; font-weight: 800;">
+                    <i data-lucide="send"></i> 출근 기록 전송 및 승인 요청
+                </button>
+            </div> <!-- attendanceSection 끝 -->
 
             <!-- 소리 알림 설정 (v1.8.9) -->
             <div
@@ -230,6 +243,28 @@
 
         let currentWorkerRule = null;
         let selectedDates = new Set();
+
+        // 출근 입력 섹션 토글 함수
+        function toggleAttendanceSection() {
+            const section = document.getElementById('attendanceSection');
+            const btn = document.getElementById('toggleAttendanceBtn');
+
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                btn.innerHTML = '<i data-lucide="chevron-up"></i> 출근 입력 닫기';
+                lucide.createIcons();
+                // [v2.5.3] 서명란 크기 재설정
+                setTimeout(() => {
+                    resizeCanvas();
+                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            } else {
+                section.style.display = 'none';
+                btn.innerHTML = '<i data-lucide="calendar-plus"></i> 출근 입력하기';
+                lucide.createIcons();
+            }
+        }
+
 
         async function fetchWorkerInfo() {
             const name = document.getElementById('workerName').value.trim();
@@ -323,6 +358,9 @@
                     </div>
                 `;
                 lucide.createIcons();
+
+                // 출근 입력 버튼 표시
+                document.getElementById('toggleAttendanceBtn').style.display = 'block';
             }
             renderWorkerCalendar();
         }
@@ -458,25 +496,67 @@
 
         function resizeCanvas() {
             const rect = canvas.getBoundingClientRect();
-            canvas.width = rect.width; canvas.height = rect.height;
-            ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+            if (rect.width > 0 && rect.height > 0) {
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+            }
         }
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function startDrawing(e) {
+            painting = true;
+            const pos = getPos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        }
+
+        function stopDrawing() {
+            painting = false;
+        }
+
         function draw(e) {
             if (!painting) return;
-            const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
-            const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
-            ctx.lineTo(x, y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, y);
+            const pos = getPos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
         }
-        canvas.addEventListener('mousedown', (e) => { painting = true; draw(e); });
-        canvas.addEventListener('mouseup', () => { painting = false; ctx.beginPath(); });
+
+        // Mouse Events
+        canvas.addEventListener('mousedown', startDrawing);
         canvas.addEventListener('mousemove', draw);
-        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); painting = true; draw(e); });
-        canvas.addEventListener('touchend', () => { painting = false; ctx.beginPath(); });
-        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); });
+        window.addEventListener('mouseup', stopDrawing);
+
+        // Touch Events (passive: false 가 모바일 브라우저에서 핵심)
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.target === canvas) {
+                e.preventDefault();
+                startDrawing(e);
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (e.target === canvas) {
+                e.preventDefault();
+                draw(e);
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', stopDrawing, { passive: false });
 
         document.getElementById('clearBtn').onclick = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
 
