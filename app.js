@@ -51,6 +51,65 @@ const ImageUtil = {
     }
 };
 
+// --- 사용자 관리 시스템 (Role-Based Access Control) ---
+const USERS_KEY = 'admin_users';
+const CURRENT_USER_KEY = 'current_user';
+
+const UserManager = {
+    initDefaultUsers: () => {
+        const existing = localStorage.getItem(USERS_KEY);
+        if (!existing) {
+            const users = [
+                { id: 1, username: 'admin', password: '000000', role: 'admin', name: '관리자' },
+                { id: 2, username: 'manager', password: '123456', role: 'manager', name: '매니저' },
+                { id: 3, username: 'viewer', password: '111111', role: 'viewer', name: '조회자' }
+            ];
+            localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        }
+    },
+
+    getUsers: () => JSON.parse(localStorage.getItem(USERS_KEY) || '[]'),
+
+    authenticate: (username, password) => {
+        const users = UserManager.getUsers();
+        return users.find(u => u.username === username && u.password === password);
+    },
+
+    getCurrentUser: () => JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || 'null'),
+
+    setCurrentUser: (user) => localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user)),
+
+    logout: () => {
+        localStorage.removeItem(CURRENT_USER_KEY);
+        location.reload();
+    },
+
+    addUser: (user) => {
+        const users = UserManager.getUsers();
+        const newUser = { ...user, id: Date.now() + Math.random() };
+        users.push(newUser);
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        return newUser;
+    },
+
+    updateUser: (user) => {
+        const users = UserManager.getUsers();
+        const index = users.findIndex(u => u.id === user.id);
+        if (index !== -1) {
+            users[index] = user;
+            localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        }
+    },
+
+    deleteUser: (id) => {
+        const users = UserManager.getUsers();
+        const filtered = users.filter(u => u.id !== id);
+        localStorage.setItem(USERS_KEY, JSON.stringify(filtered));
+    }
+};
+
+UserManager.initDefaultUsers();
+
 const AttendanceDB = {
     getAll: () => {
         try {
