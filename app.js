@@ -1,5 +1,7 @@
 const DB_KEY = 'attendance_data';
 const WORKERS_KEY = 'worker_list';
+const PASSWORD_KEY = 'admin_password';
+const DEFAULT_PASSWORD = '1234';
 
 // --- 실제 배포된 인터넷 주소를 여기에 적으세요 (예: https://my-app.github.io) ---
 // 이 주소가 없으면 직원들이 링크를 눌러도 접속할 수 없습니다.
@@ -50,65 +52,6 @@ const ImageUtil = {
         });
     }
 };
-
-// --- 사용자 관리 시스템 (Role-Based Access Control) ---
-const USERS_KEY = 'admin_users';
-const CURRENT_USER_KEY = 'current_user';
-
-const UserManager = {
-    initDefaultUsers: () => {
-        const existing = localStorage.getItem(USERS_KEY);
-        if (!existing) {
-            const users = [
-                { id: 1, username: 'admin', password: '000000', role: 'admin', name: '관리자' },
-                { id: 2, username: 'manager', password: '123456', role: 'manager', name: '매니저' },
-                { id: 3, username: 'viewer', password: '111111', role: 'viewer', name: '조회자' }
-            ];
-            localStorage.setItem(USERS_KEY, JSON.stringify(users));
-        }
-    },
-
-    getUsers: () => JSON.parse(localStorage.getItem(USERS_KEY) || '[]'),
-
-    authenticate: (username, password) => {
-        const users = UserManager.getUsers();
-        return users.find(u => u.username === username && u.password === password);
-    },
-
-    getCurrentUser: () => JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || 'null'),
-
-    setCurrentUser: (user) => localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user)),
-
-    logout: () => {
-        localStorage.removeItem(CURRENT_USER_KEY);
-        location.reload();
-    },
-
-    addUser: (user) => {
-        const users = UserManager.getUsers();
-        const newUser = { ...user, id: Date.now() + Math.random() };
-        users.push(newUser);
-        localStorage.setItem(USERS_KEY, JSON.stringify(users));
-        return newUser;
-    },
-
-    updateUser: (user) => {
-        const users = UserManager.getUsers();
-        const index = users.findIndex(u => u.id === user.id);
-        if (index !== -1) {
-            users[index] = user;
-            localStorage.setItem(USERS_KEY, JSON.stringify(users));
-        }
-    },
-
-    deleteUser: (id) => {
-        const users = UserManager.getUsers();
-        const filtered = users.filter(u => u.id !== id);
-        localStorage.setItem(USERS_KEY, JSON.stringify(filtered));
-    }
-};
-
-UserManager.initDefaultUsers();
 
 const AttendanceDB = {
     getAll: () => {
@@ -952,7 +895,36 @@ const AutoBackupSystem = {
             console.error('Archive failed', e);
             throw e;
         }
-    }
+    },
+
+    // Password management
+    getPassword: () => {
+        const pwd = localStorage.getItem(PASSWORD_KEY);
+        return pwd || DEFAULT_PASSWORD; // Return default if not set
+    },
+
+    savePassword: (newPassword) => {
+        localStorage.setItem(PASSWORD_KEY, newPassword);
+    },
+
+    // App settings
+    getAppTitle: () => localStorage.getItem('app_title') || 'AttendanceMaster',
+    saveAppTitle: (title) => localStorage.setItem('app_title', title),
+
+    getAppLogo: () => localStorage.getItem('app_logo') || '',
+    saveAppLogo: (logo) => localStorage.setItem('app_logo', logo),
+
+    getAutoLogoutTime: () => parseInt(localStorage.getItem('auto_logout_time') || '60'),
+    saveAutoLogoutTime: (minutes) => localStorage.setItem('auto_logout_time', minutes.toString()),
+
+    getDeadline: () => localStorage.getItem('submission_deadline') || '매월 5일',
+    saveDeadline: (deadline) => localStorage.setItem('submission_deadline', deadline),
+
+    getNotice: () => localStorage.getItem('app_notice') || '',
+    saveNotice: (notice) => localStorage.setItem('app_notice', notice),
+
+    getSoundEnabled: () => localStorage.getItem('sound_enabled') !== 'false',
+    saveSoundEnabled: (enabled) => localStorage.setItem('sound_enabled', enabled.toString())
 };
 
 function isMobile() {

@@ -152,9 +152,6 @@
             <p style="color: var(--text-muted); font-size: 0.9rem;">관리자 인증</p>
 
             <div class="login-input-group">
-                <input type="text" id="adminUsernameInput" class="login-input" placeholder="아이디를 입력하세요"
-                    autocomplete="username"
-                    onkeyup="if(event.key==='Enter') document.getElementById('adminPasswordInput').focus()">
                 <input type="password" id="adminPasswordInput" class="login-input" placeholder="비밀번호를 입력하세요"
                     autocomplete="current-password" onkeyup="if(event.key==='Enter') checkAdminLogin()">
                 <button class="btn btn-primary" onclick="checkAdminLogin()" style="width: 100%; padding: 1rem;">
@@ -162,35 +159,22 @@
                 </button>
             </div>
 
-            <!-- 역할별 권한 설명 -->
-            <div
-                style="margin-top: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 0.5rem; text-align: left; font-size: 0.75rem; color: var(--text-muted);">
-                <div style="margin-bottom: 0.5rem; font-weight: 600; color: var(--primary);">👤 역할별 권한</div>
-                <div style="margin-bottom: 0.3rem;">👑 <strong>관리자</strong>: 모든 기능 사용 가능</div>
-                <div style="margin-bottom: 0.3rem;">👔 <strong>매니저</strong>: 조회/수정/등록 (삭제 및 설정 제외)</div>
-                <div>👁️ <strong>조회자</strong>: 조회 및 출력만 가능</div>
-            </div>
-
-            <p id="loginError" style="color: var(--danger); font-size: 0.85rem; margin-top: 1rem; display: none;">아이디 또는
-                비밀번호가 일치하지 않습니다.</p>
+            <p id="loginError" style="color: var(--danger); font-size: 0.85rem; margin-top: 1rem; display: none;">비밀번호가
+                일치하지 않습니다.</p>
         </div>
     </div>
 
+    <!-- Load app.js FIRST so AttendanceDB is available -->
+    <script src="app.js?v=20260210"></script>
+
     <script>
         function checkAdminLogin() {
-            const username = document.getElementById('adminUsernameInput').value.trim();
             const password = document.getElementById('adminPasswordInput').value;
+            const savedPassword = AttendanceDB.getPassword();
 
-            const user = UserManager.authenticate(username, password);
-
-            if (user) {
-                UserManager.setCurrentUser(user);
+            if (password === savedPassword) {
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('adminContent').style.display = 'block';
-
-                // 역할별 권한 적용
-                applyRolePermissions(user.role);
-
                 refreshAppTitles();
                 lucide.createIcons();
                 if (typeof renderAggregatedTable === 'function') renderAggregatedTable();
@@ -201,48 +185,6 @@
                 AudioUtil.playError();
                 const error = document.getElementById('loginError');
                 error.style.display = 'block';
-            }
-        }
-
-        // 역할별 권한 적용 함수
-        function applyRolePermissions(role) {
-            const currentUser = UserManager.getCurrentUser();
-            if (!currentUser) return;
-
-            // 사용자 이름 표시
-            const userInfo = document.createElement('div');
-            userInfo.id = 'currentUserInfo';
-            userInfo.style.cssText = 'position: fixed; top: 1rem; right: 1rem; background: var(--surface); padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.85rem; z-index: 100; display: flex; align-items: center; gap: 0.5rem;';
-
-            const roleEmoji = role === 'admin' ? '👑' : role === 'manager' ? '👔' : '👁️';
-            const roleName = role === 'admin' ? '관리자' : role === 'manager' ? '매니저' : '조회자';
-
-            userInfo.innerHTML = `
-                <span>${roleEmoji} <strong>${currentUser.name}</strong> (${roleName})</span>
-                <button class="btn btn-secondary" onclick="UserManager.logout()" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">로그아웃</button>
-            `;
-            document.body.appendChild(userInfo);
-
-            if (role === 'viewer') {
-                // 조회자: 모든 수정/삭제 버튼 숨김
-                document.querySelectorAll('.btn-danger, .btn-primary[onclick*="delete"], .btn-primary[onclick*="update"], .btn-secondary[onclick*="save"], .btn-secondary[onclick*="add"], .btn-secondary[onclick*="open"]').forEach(btn => {
-                    if (!btn.onclick || !btn.onclick.toString().includes('print')) {
-                        btn.style.display = 'none';
-                    }
-                });
-                // 설정 탭 숨김
-                const settingsTab = document.querySelector('[onclick*="settingsView"]');
-                if (settingsTab) settingsTab.style.display = 'none';
-            }
-
-            if (role === 'manager') {
-                // 매니저: 설정 탭 숨김, 삭제 버튼만 숨김
-                const settingsTab = document.querySelector('[onclick*="settingsView"]');
-                if (settingsTab) settingsTab.style.display = 'none';
-
-                document.querySelectorAll('.btn-danger').forEach(btn => {
-                    btn.style.display = 'none';
-                });
             }
         }
 
@@ -802,6 +744,162 @@
                                 설정</button>
                         </div>
                     </div>
+
+                    <script>
+                        // Settings update functions
+                        function updateAppTitle() {
+                            const input = document.getElementById('appTitleInput');
+                            const value = input.value.trim();
+                            if (!value) return alert('앱 이름을 입력하세요.');
+                            AttendanceDB.saveAppTitle(value);
+                            refreshAppTitles();
+                            AudioUtil.playSuccess();
+                            alert('앱 이름이 변경되었습니다!');
+                        }
+                        function updateAutoLogoutTime() {
+                            const minutes = parseInt(document.getElementById('autoLogoutInput').value);
+                            if (isNaN(minutes) || minutes < 0) return alert('올바른 숫자를 입력하세요.');
+                            AttendanceDB.saveAutoLogoutTime(minutes);
+                            AudioUtil.playSuccess();
+                            alert(`자동 로그아웃 시간이 ${minutes}분으로 설정되었습니다!`);
+                        }
+
+                        function updateDeadline() {
+                            const deadline = document.getElementById('deadlineInput').value.trim();
+                            if (!deadline) return alert('제출 기한을 입력하세요.');
+                            AttendanceDB.saveDeadline(deadline);
+                            AudioUtil.playSuccess();
+                            alert('제출 기한이 설정되었습니다!');
+                        }
+
+                        function updateAppLogo(input) {
+                            const file = input.files[0];
+                            if (!file) return;
+                            if (!file.type.startsWith('image/')) return alert('이미지 파일만 선택할 수 있습니다.');
+
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                const logoData = e.target.result;
+                                AttendanceDB.saveAppLogo(logoData);
+                                document.getElementById('logoPreview').innerHTML = `<img src="${logoData}" class="logo-img">`;
+                                refreshAppTitles();
+                                AudioUtil.playSuccess();
+                                alert('로고가 변경되었습니다!');
+                            };
+                            reader.readAsDataURL(file);
+                        }
+
+                        function resetAppLogo() {
+                            if (!confirm('로고를 초기화하시겠습니까')) return;
+                            AttendanceDB.saveAppLogo('');
+                            document.getElementById('logoPreview').innerHTML = '<i data-lucide="image" style="color:#ccc;"></i>';
+                            refreshAppTitles();
+                            AudioUtil.playSuccess();
+                            alert('로고가 초기화되었습니다!');
+                        }
+
+                        function updateNotice() {
+                            const notice = document.getElementById('noticeTextArea').value.trim();
+                            AttendanceDB.saveNotice(notice);
+                            AudioUtil.playSuccess();
+                            alert('공지사항이 저장되었습니다!');
+                        }
+
+                        function loadNotice() {
+                            const notice = AttendanceDB.getNotice();
+                            const textarea = document.getElementById('noticeTextArea');
+                            if (textarea) textarea.value = notice;
+                        }
+
+                        function loadSettingsUI() {
+                            // Load current settings into UI
+                            const appTitle = AttendanceDB.getAppTitle();
+                            const autoLogout = AttendanceDB.getAutoLogoutTime();
+                            const deadline = AttendanceDB.getDeadline();
+                            const logo = AttendanceDB.getAppLogo();
+
+                            const appTitleInput = document.getElementById('appTitleInput');
+                            const autoLogoutInput = document.getElementById('autoLogoutInput');
+                            const deadlineInput = document.getElementById('deadlineInput');
+                            const logoPreview = document.getElementById('logoPreview');
+
+                            if (appTitleInput) appTitleInput.value = appTitle;
+                            if (autoLogoutInput) autoLogoutInput.value = autoLogout;
+                            if (deadlineInput) deadlineInput.value = deadline;
+                            if (logoPreview && logo) {
+                                logoPreview.innerHTML = `<img src="${logo}" class="logo-img">`;
+                            }
+                        }
+
+                        // Load settings when page loads
+                        window.addEventListener('DOMContentLoaded', () => {
+                            loadSettingsUI();
+                        });
+
+                        // Factory Reset - Complete system reset
+                        async function factoryReset() {
+                            const confirmText = `⚠️ 완전 초기화를 실행하시겊습니까?\n\n삭제되는 내용:\n- 모든 출근 기록\n- 인원 명단\n- 설정 (앱 이름, 로고 등)\n- 휴일 정보\n\n서버 데이터도 모두 삭제됩니다.`;
+
+                            if (!confirm(confirmText)) return;
+
+                            // 2차 확인
+                            const finalConfirm = prompt('정말로 모든 데이터를 삭제하시려면\n"완전삭제" 라고 입력하세요:');
+                            if (finalConfirm !== '완전삭제') {
+                                alert('취소되었습니다.');
+                                return;
+                            }
+
+                            try {
+                                // 1. localStorage 완전 삭제
+                                localStorage.clear();
+
+                                // 2. 서버 데이터 삭제 (Firebase)
+                                if (SERVER_CONFIG.useServer && SERVER_CONFIG.databaseURL) {
+                                    const fy = FiscalYearUtil.getCurrentYear();
+
+                                    // 출근 기록 삭제
+                                    await fetch(`${SERVER_CONFIG.databaseURL}/records/${fy}.json`, { method: 'DELETE' });
+
+                                    // 인원 명단 삭제
+                                    await fetch(`${SERVER_CONFIG.databaseURL}/workers.json`, { method: 'DELETE' });
+
+                                    // 대기 인원 삭제
+                                    await fetch(`${SERVER_CONFIG.databaseURL}/pending_workers.json`, { method: 'DELETE' });
+
+                                    // 설정 삭제
+                                    await fetch(`${SERVER_CONFIG.databaseURL}/settings.json`, { method: 'DELETE' });
+
+                                    // 휴일 설정 삭제
+                                    await fetch(`${SERVER_CONFIG.databaseURL}/holidays.json`, { method: 'DELETE' });
+                                }
+
+                                alert('✅ 완전 초기화가 완료되었습니다.\n\n페이지를 새로고침합니다.');
+
+                                // 페이지 새로고침
+                                window.location.reload();
+
+                            } catch (e) {
+                                console.error('완전 초기화 실패:', e);
+                                alert('⚠️ 초기화 중 오류가 발생했습니다.\n일부 데이터가 남아있을 수 있습니다.');
+                            }
+                        }
+
+                        // Local Records Clear - Clear only local attendance records
+                        function clearLocalRecords() {
+                            if (!confirm('현재 PC에 저장된 출근 기록을 삭제하시겠습니까?\n\n서버 데이터와 설정, 인원명단은 유지됩니다.')) return;
+
+                            try {
+                                const fy = FiscalYearUtil.getCurrentYear();
+                                localStorage.removeItem(`attendance_records_${fy}`);
+                                AudioUtil.playSuccess();
+                                alert('로컬 출근 기록이 삭제되었습니다.');
+                                location.reload();
+                            } catch (e) {
+                                console.error('로컬 초기화 실패:', e);
+                                alert('⚠️ 초기화 중 오류가 발생했습니다.');
+                            }
+                        }
+                    </script>
 
                     <div style="margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border);">
                         <h3>방학 기간 설정 (v1.7)</h3>
