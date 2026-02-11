@@ -440,6 +440,17 @@ const AttendanceDB = {
         }
     },
 
+    deleteAllNotifications: async (workerName) => {
+        if (!SERVER_CONFIG.useServer) return;
+        try {
+            await fetch(`${SERVER_CONFIG.databaseURL}/notifications/${encodeURIComponent(workerName)}.json`, {
+                method: 'DELETE'
+            });
+        } catch (error) {
+            console.error('Delete all notifications error:', error);
+        }
+    },
+
     getAppTitle: () => localStorage.getItem('app_title') || '프리미엄 근태 관리',
     saveAppTitle: (title) => {
         const value = title || '프리미엄 근태 관리';

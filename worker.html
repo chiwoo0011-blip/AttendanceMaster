@@ -123,10 +123,16 @@
                         <span id="unreadBadge"
                             style="display: none; background: #ef4444; color: white; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: 700;"></span>
                     </div>
-                    <button onclick="toggleNotifications()"
-                        style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem;">
-                        <span id="toggleNotificationsText">펼치기</span>
-                    </button>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button onclick="deleteAllNotificationsUI()"
+                            style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.85rem; font-weight: 600;">
+                            모두 삭제
+                        </button>
+                        <button onclick="toggleNotifications()"
+                            style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem;">
+                            <span id="toggleNotificationsText">펼치기</span>
+                        </button>
+                    </div>
                 </div>
                 <div id="notificationsList" style="display: none;">
                     <!-- 알림 목록이 동적으로 생성됩니다 -->
@@ -258,6 +264,8 @@
         window.addEventListener('load', async () => {
             if (SERVER_CONFIG.useServer) {
                 await AttendanceDB.syncSettingsWithServer();
+                await AttendanceDB.syncWorkersWithServer(); // 직원 명단 서버 동기화
+                await HolidayUtil.init(); // 휴일 데이터 로드
             }
             renderNotice();
             monthInput.value = new Date().toISOString().slice(0, 7);
@@ -281,16 +289,14 @@
         // 공지사항 렌더링
         function renderNotice() {
             const notice = AttendanceDB.getNotice();
+            const noticeContainer = document.getElementById('noticeContainer');
             const content = document.getElementById('noticeContent');
-            const emptyMsg = document.getElementById('noticeEmptyMsg');
 
             if (notice && notice.trim().length > 0) {
+                noticeContainer.style.display = 'block';
                 content.innerHTML = notice.replace(/\n/g, '<br>');
-                content.style.display = 'block';
-                if (emptyMsg) emptyMsg.style.display = 'none';
             } else {
-                content.style.display = 'none';
-                if (emptyMsg) emptyMsg.style.display = 'block';
+                noticeContainer.style.display = 'none';
             }
         }
 
@@ -889,6 +895,31 @@
                 await loadNotifications(workerName);
             } catch (error) {
                 console.error('Mark as read error:', error);
+            }
+        }
+
+        // 모든 알림 삭제
+        async function deleteAllNotificationsUI() {
+            const workerName = document.getElementById('workerName').value.trim();
+            if (!workerName) {
+                AudioUtil.playError();
+                alert('직원 정보를 먼저 조회해주세요.');
+                return;
+            }
+
+            if (!confirm('모든 알림을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
+                return;
+            }
+
+            try {
+                await AttendanceDB.deleteAllNotifications(workerName);
+                AudioUtil.playSuccess();
+                document.getElementById('personalNotificationsContainer').style.display = 'none';
+                alert('모든 알림이 삭제되었습니다.');
+            } catch (error) {
+                console.error('Delete all notifications error:', error);
+                AudioUtil.playError();
+                alert('알림 삭제 중 오류가 발생했습니다.');
             }
         }
     </script>

@@ -628,8 +628,8 @@
                         <button class="btn btn-primary" onclick="updateNotice()" style="padding: 0.75rem 2rem;">
                             <i data-lucide="save"></i> 게시하기
                         </button>
-                        <button class="btn btn-secondary" onclick="document.getElementById('noticeTextArea').value=''">
-                            <i data-lucide="trash-2"></i> 내용 지우기
+                        <button class="btn btn-secondary" onclick="clearNotice()" style="background: #ef4444;">
+                            <i data-lucide="trash-2"></i> 공지 초기화
                         </button>
                     </div>
 
@@ -2094,6 +2094,15 @@
                 await AttendanceDB.saveNotice(content);
                 AudioUtil.playSuccess();
                 alert('공지사항이 저장되어 게시되었습니다.');
+            }
+
+            async function clearNotice() {
+                if (confirm('공지사항을 완전히 삭제하시겠습니까?\n직원 페이지에서 공지가 사라집니다.')) {
+                    document.getElementById('noticeTextArea').value = '';
+                    await AttendanceDB.saveNotice('');
+                    AudioUtil.playSuccess();
+                    alert('공지사항이 삭제되었습니다.');
+                }
             }
 
             function clearLocalRecords() {

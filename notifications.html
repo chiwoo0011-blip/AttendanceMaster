@@ -164,6 +164,22 @@
                     </div>
                 </div>
 
+                <!-- 검색 바 -->
+                <div style="margin-bottom: 1.5rem; position: relative;">
+                    <input type="text" id="searchInput"
+                        placeholder="🔍 이름 또는 전화번호로 검색..."
+                        oninput="filterWorkers()"
+                        style="width: 100%; padding: 0.75rem 3rem 0.75rem 1rem; border: 2px solid var(--border); border-radius: 8px; font-size: 1rem;">
+                    <button onclick="clearSearch()"
+                        style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.5rem;">
+                        <i data-lucide="x" style="width: 18px;"></i>
+                    </button>
+                </div>
+
+                <div style="margin-bottom: 0.75rem; color: var(--text-muted); font-size: 0.9rem;">
+                    <span id="filterInfo">전체 인원 표시</span>
+                </div>
+
                 <div class="worker-grid" id="workerGrid">
                     <!-- 직원 카드가 동적으로 생성됩니다 -->
                 </div>
@@ -217,26 +233,62 @@
         });
 
         // 직원 목록 렌더링
-        function renderWorkers() {
-            const workers = AttendanceDB.getWorkers();
+        function renderWorkers(filteredWorkers = null) {
+            const workers = filteredWorkers || AttendanceDB.getWorkers();
             const grid = document.getElementById('workerGrid');
 
             if (workers.length === 0) {
-                grid.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem; grid-column: 1 / -1;">등록된 직원이 없습니다.</p>';
+                const searchTerm = document.getElementById('searchInput').value.trim();
+                if (searchTerm) {
+                    grid.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem; grid-column: 1 / -1;">검색 결과가 없습니다.</p>';
+                } else {
+                    grid.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem; grid-column: 1 / -1;">등록된 직원이 없습니다.</p>';
+                }
                 return;
             }
 
-            grid.innerHTML = workers.map(worker => `
-                <div class="worker-card" onclick="toggleWorker('${worker.name}')" id="card-${worker.name}">
-                    <div class="worker-name">
-                        <i data-lucide="user" style="width: 16px; display: inline;"></i>
-                        ${worker.name}
+            grid.innerHTML = workers.map(worker => {
+                const isSelected = selectedWorkers.has(worker.name);
+                return `
+                    <div class="worker-card ${isSelected ? 'selected' : ''}" onclick="toggleWorker('${worker.name}')" id="card-${worker.name}">
+                        <div class="worker-name">
+                            <i data-lucide="user" style="width: 16px; display: inline;"></i>
+                            ${worker.name}
+                        </div>
+                        <div class="worker-info">${worker.workType || '상시근무'}</div>
+                        <div class="worker-info" style="font-size: 0.75rem;">${worker.phone || ''}</div>
                     </div>
-                    <div class="worker-info">${worker.workType || '상시근무'}</div>
-                    <div class="worker-info" style="font-size: 0.75rem;">${worker.phone || ''}</div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
+            lucide.createIcons();
+        }
+
+        // 직원 검색 필터링
+        function filterWorkers() {
+            const searchTerm = document.getElementById('searchInput').value.trim().toLowerCase();
+            const allWorkers = AttendanceDB.getWorkers();
+
+            if (!searchTerm) {
+                renderWorkers();
+                document.getElementById('filterInfo').innerText = `전체 인원 표시 (${allWorkers.length}명)`;
+                return;
+            }
+
+            const filtered = allWorkers.filter(worker => {
+                const nameMatch = worker.name.toLowerCase().includes(searchTerm);
+                const phoneMatch = worker.phone && worker.phone.includes(searchTerm);
+                return nameMatch || phoneMatch;
+            });
+
+            renderWorkers(filtered);
+            document.getElementById('filterInfo').innerText = `검색 결과: ${filtered.length}명 / 전체 ${allWorkers.length}명`;
+        }
+
+        // 검색 초기화
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            filterWorkers();
             lucide.createIcons();
         }
 
