@@ -233,6 +233,26 @@
                 setInterval(refreshNotifications, 60000);
             }
             refreshAppTitles();
+
+            // URL 파라미터로 탭 직접 이동 (notifications.html 등에서 돌아올 때)
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetTab = urlParams.get('tab');
+            if (targetTab) {
+                // 비밀번호 화면 건너뛰고 바로 대시보드 표시
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('adminContent').style.display = 'block';
+                lucide.createIcons();
+                resetInactivityTimer();
+                // 해당 탭으로 이동
+                const navLinks = document.querySelectorAll('.nav-link');
+                let targetNavItem = null;
+                navLinks.forEach(link => {
+                    if (link.getAttribute('onclick') && link.getAttribute('onclick').includes(targetTab)) {
+                        targetNavItem = link;
+                    }
+                });
+                switchTab(targetTab, targetNavItem);
+            }
         });
 
         // [v2.5.0] 통합 알림 갱신 (승인대기 + 출근부제출) - 소리 제거됨 + [v2.5.1] 읽음 처리
@@ -556,8 +576,8 @@
                 <div class="glass" style="padding: 1.5rem; margin-bottom: 2rem;">
                     <h2 style="margin-bottom: 1rem;">출근 명단</h2>
                     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
-                        <button class="btn btn-primary" onclick="copyAttendanceLink()">
-                            <i data-lucide="copy"></i> 링 크
+                        <button class="btn btn-primary" onclick="window.location.href='notifications.html'">
+                            <i data-lucide="bell"></i> 알림 전송
                         </button>
                         <button class="btn btn-secondary" onclick="openWorkerModal()">
                             <i data-lucide="user-plus"></i> 등록

@@ -5,6 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>출근 확인 - 근태관리 시스템</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="출근앱">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3652/3652191.png">
+
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -101,6 +110,26 @@
                         style="color: var(--text-muted); font-size: 0.9rem; font-style: italic; display: none;">
                         등록된 공지사항이 없습니다.
                     </div>
+                </div>
+            </div>
+
+            <!-- 개인 알림 영역 -->
+            <div id="personalNotificationsContainer" style="margin-bottom: 2rem; display: none;">
+                <div
+                    style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; margin-left: 4px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <i data-lucide="bell" style="width: 18px; color: var(--primary);"></i>
+                        <span style="font-size: 0.9rem; font-weight: 800; color: var(--primary);">내 알림</span>
+                        <span id="unreadBadge"
+                            style="display: none; background: #ef4444; color: white; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: 700;"></span>
+                    </div>
+                    <button onclick="toggleNotifications()"
+                        style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem;">
+                        <span id="toggleNotificationsText">펼치기</span>
+                    </button>
+                </div>
+                <div id="notificationsList" style="display: none;">
+                    <!-- 알림 목록이 동적으로 생성됩니다 -->
                 </div>
             </div>
         </header>
@@ -200,6 +229,24 @@
         </main>
     </div>
 
+    <!-- Firebase SDK for FCM -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
+    <script>
+        // TODO: Firebase Console > Project Settings > General > Your apps 에서 값을 복사하세요
+        if (!firebase.apps.length) {
+            firebase.initializeApp({
+                apiKey: "AIzaSyCOQ0VF_4piElLF_oHOi7IFmNaOCI_25iA",
+                authDomain: "yrs-workingdaycheck.firebaseapp.com",
+                databaseURL: "https://yrs-workingdaycheck-default-rtdb.firebaseio.com/",
+                projectId: "yrs-workingdaycheck",
+                storageBucket: "yrs-workingdaycheck.appspot.com",
+                messagingSenderId: "20187121102",
+                appId: "1:20187121102:web:6cee6c6145e232bf1a579f"
+            });
+        }
+    </script>
+
     <script src="app.js"></script>
     <script>
         lucide.createIcons();
@@ -216,6 +263,19 @@
             monthInput.value = new Date().toISOString().slice(0, 7);
             updateSoundUI();
             lucide.createIcons();
+
+            // PWA Service Worker 등록
+            if ('serviceWorker' in navigator) {
+                try {
+                    await navigator.serviceWorker.register('/service-worker.js');
+                    console.log('Service Worker registered');
+                } catch (error) {
+                    console.error('Service Worker registration failed:', error);
+                }
+            }
+
+            // Firebase Cloud Messaging 초기화
+            initializeFirebaseMessaging();
         });
 
         // 공지사항 렌더링
@@ -359,6 +419,13 @@
                 `;
                 lucide.createIcons();
                 document.getElementById('toggleAttendanceBtn').style.display = 'block';
+
+                // FCM 토큰이 있으면 이 직원 이름으로 서버에 저장
+                if (window.__fcmToken) {
+                    AttendanceDB.saveFCMToken(worker.name, window.__fcmToken);
+                }
+                // 개인 알림 로드
+                loadNotifications(worker.name);
             }
             renderWorkerCalendar();
         }
@@ -692,6 +759,136 @@
                 console.error(e);
                 AudioUtil.playError();
                 alert(e.message || '신청 중 오류가 발생했습니다.');
+            }
+        }
+
+        // Firebase Cloud Messaging 초기화
+        async function initializeFirebaseMessaging() {
+            if (typeof firebase === 'undefined' || !firebase.apps.length) {
+                console.log('Firebase not initialized yet');
+                return;
+            }
+
+            try {
+                const messaging = firebase.messaging();
+
+                // FCM 전용 서비스워커 명시적 등록
+                const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+
+                // 알림 권한 요청
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    console.log('Notification permission granted');
+
+                    // FCM 토큰 가져오기
+                    // TODO: Firebase Console > Cloud Messaging > Web Push certificates 에서 VAPID Key를 복사하세요
+                    const currentToken = await messaging.getToken({
+                        vapidKey: 'BDxcmFoYTEEEJXLVHfdQNiLvfxfSeFajBAB-dIyfpDJ4CV7e7d1RZ6ELZ88_pA29RdUs4elNsw80EomNA2lduQA',
+                        serviceWorkerRegistration: swRegistration
+                    });
+
+                    if (currentToken) {
+                        console.log('FCM Token obtained');
+                        // 토큰을 메모리에 보관 (직원 조회 시 DB에 저장)
+                        window.__fcmToken = currentToken;
+                    }
+                } else {
+                    console.log('Notification permission denied');
+                }
+
+                // 포그라운드 메시지 수신
+                messaging.onMessage((payload) => {
+                    console.log('Message received:', payload);
+                    const notificationTitle = payload.notification.title || '새 알림';
+                    const notificationOptions = {
+                        body: payload.notification.body || '',
+                        icon: '/icon-192.png'
+                    };
+
+                    new Notification(notificationTitle, notificationOptions);
+                    AudioUtil.playInfo();
+
+                    // 알림 목록 갱신
+                    const workerName = document.getElementById('workerName').value.trim();
+                    if (workerName) loadNotifications(workerName);
+                });
+
+            } catch (error) {
+                console.error('FCM initialization error:', error);
+            }
+        }
+
+        // 알림 목록 로드
+        async function loadNotifications(workerName) {
+            if (!workerName || !SERVER_CONFIG.useServer) return;
+
+            try {
+                const notifications = await AttendanceDB.getNotifications(workerName);
+                if (notifications.length > 0) {
+                    renderNotifications(notifications, workerName);
+                    document.getElementById('personalNotificationsContainer').style.display = 'block';
+                } else {
+                    document.getElementById('personalNotificationsContainer').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Load notifications error:', error);
+            }
+        }
+
+        // 알림 렌더링
+        function renderNotifications(notifications, workerName) {
+            const list = document.getElementById('notificationsList');
+            const unreadCount = notifications.filter(n => !n.read).length;
+
+            const badge = document.getElementById('unreadBadge');
+            if (unreadCount > 0) {
+                badge.textContent = unreadCount;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+
+            list.innerHTML = notifications.map(notification => {
+                const date = new Date(notification.timestamp);
+                const timeStr = `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                const readClass = notification.read ? 'opacity: 0.6;' : '';
+
+                return `
+                    <div class="glass" style="padding: 1rem; margin-bottom: 0.75rem; border-left: 3px solid var(--primary); ${readClass}" onclick="markAsRead('${workerName}', '${notification.id}')">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                            <div style="font-weight: 700; font-size: 1rem;">${notification.title}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">${timeStr}</div>
+                        </div>
+                        <div style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.4;">${notification.body}</div>
+                        ${!notification.read ? '<div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--primary);">● 읽지 않음</div>' : ''}
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        // 알림 토글
+        function toggleNotifications() {
+            const list = document.getElementById('notificationsList');
+            const text = document.getElementById('toggleNotificationsText');
+
+            if (list.style.display === 'none') {
+                list.style.display = 'block';
+                text.textContent = '접기';
+            } else {
+                list.style.display = 'none';
+                text.textContent = '펼치기';
+            }
+        }
+
+        // 읽음 처리
+        async function markAsRead(workerName, notificationId) {
+            try {
+                await AttendanceDB.markNotificationAsRead(workerName, notificationId);
+                await loadNotifications(workerName);
+            } catch (error) {
+                console.error('Mark as read error:', error);
             }
         }
     </script>

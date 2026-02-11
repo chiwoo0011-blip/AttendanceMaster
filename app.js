@@ -373,6 +373,73 @@ const AttendanceDB = {
         AttendanceDB.saveSettingsToServer();
     },
 
+    // FCM Token 관리
+    saveFCMToken: async (workerName, token) => {
+        if (!SERVER_CONFIG.useServer) return;
+        try {
+            await fetch(`${SERVER_CONFIG.databaseURL}/fcmTokens/${encodeURIComponent(workerName)}.json`, {
+                method: 'PUT',
+                body: JSON.stringify(token)
+            });
+        } catch (error) {
+            console.error('FCM token save error:', error);
+        }
+    },
+
+    getFCMToken: async (workerName) => {
+        if (!SERVER_CONFIG.useServer) return null;
+        try {
+            const response = await fetch(`${SERVER_CONFIG.databaseURL}/fcmTokens/${encodeURIComponent(workerName)}.json`);
+            return await response.json();
+        } catch (error) {
+            console.error('FCM token get error:', error);
+            return null;
+        }
+    },
+
+    // 알림 관리
+    saveNotification: async (workerName, notification) => {
+        if (!SERVER_CONFIG.useServer) return;
+        try {
+            const notificationId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            await fetch(`${SERVER_CONFIG.databaseURL}/notifications/${encodeURIComponent(workerName)}/${notificationId}.json`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    ...notification,
+                    id: notificationId,
+                    timestamp: new Date().toISOString(),
+                    read: false
+                })
+            });
+        } catch (error) {
+            console.error('Notification save error:', error);
+        }
+    },
+
+    getNotifications: async (workerName) => {
+        if (!SERVER_CONFIG.useServer) return [];
+        try {
+            const response = await fetch(`${SERVER_CONFIG.databaseURL}/notifications/${encodeURIComponent(workerName)}.json`);
+            const data = await response.json();
+            return data ? Object.values(data) : [];
+        } catch (error) {
+            console.error('Notification get error:', error);
+            return [];
+        }
+    },
+
+    markNotificationAsRead: async (workerName, notificationId) => {
+        if (!SERVER_CONFIG.useServer) return;
+        try {
+            await fetch(`${SERVER_CONFIG.databaseURL}/notifications/${encodeURIComponent(workerName)}/${notificationId}/read.json`, {
+                method: 'PUT',
+                body: JSON.stringify(true)
+            });
+        } catch (error) {
+            console.error('Mark notification as read error:', error);
+        }
+    },
+
     getAppTitle: () => localStorage.getItem('app_title') || '프리미엄 근태 관리',
     saveAppTitle: (title) => {
         const value = title || '프리미엄 근태 관리';
