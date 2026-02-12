@@ -1,5 +1,5 @@
 // Service Worker for PWA - Network First, Cache Fallback
-const CACHE_NAME = 'attendance-app-v5';
+const CACHE_NAME = 'attendance-app-v6';
 const urlsToCache = [
     '/worker.html',
     '/app.js',

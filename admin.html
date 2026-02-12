@@ -8,11 +8,11 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>관리자 대시보드 v3.0 - 근태관리 시스템</title>
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=5">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
     <style>
         .nav-tabs {
             display: flex;
@@ -168,7 +168,7 @@
     </div>
 
     <!-- Load app.js FIRST so AttendanceDB is available -->
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
 
     <script>
         function checkAdminLogin() {
@@ -689,6 +689,17 @@
                         <div style="color: var(--primary);">토</div>
                     </div>
                     <div id="holidayCalendarGrid" class="calendar-grid"></div>
+                    <div id="holidayPendingInfo" style="display:none; margin-top: 1rem; padding: 0.8rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; font-size: 0.9rem; color: #856404;">
+                        <span id="holidayPendingText"></span>
+                    </div>
+                    <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                        <button id="holidaySaveBtn" class="btn btn-primary" style="display:none; flex:1;" onclick="saveHolidayChanges()">
+                            휴일 변경사항 저장
+                        </button>
+                        <button id="holidayCancelBtn" class="btn btn-secondary" style="display:none; flex:1;" onclick="cancelHolidayChanges()">
+                            변경 취소
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -1311,42 +1322,135 @@
                 pendingNavItem = null;
             }
 
-            async function toggleHoliday(dateStr) {
-                const currentName = HolidayUtil.getHolidayName(dateStr);
-                const isCustom = HolidayUtil.customHolidays[dateStr];
-                const isVac = AttendanceDB.isInVacation(dateStr);
+            // 휴일 변경 대기 목록 (서버 저장 전 로컬 변경사항)
+            var holidayPendingChanges = { added: {}, removed: {} };
+            // 저장 전 원본 백업
+            var holidayOriginalSnapshot = null;
 
-                // 방학 기간인 경우: 방학 중 출근일 토글
+            function toggleHoliday(dateStr) {
+                var currentName = HolidayUtil.getHolidayName(dateStr);
+                var isCustom = HolidayUtil.customHolidays[dateStr];
+                var isVac = AttendanceDB.isInVacation(dateStr);
+
+                // 방학 기간인 경우: 방학 중 출근일 토글 (즉시 저장)
                 if (isVac) {
-                    const workingDays = AttendanceDB.getVacationWorkingDays();
+                    var workingDays = AttendanceDB.getVacationWorkingDays();
                     if (workingDays.includes(dateStr)) {
                         if (confirm(`'${dateStr}'을(를) 방학 중 출근일에서 해제하시겠습니까?`)) {
-                            const updated = workingDays.filter(d => d !== dateStr);
-                            await AttendanceDB.saveVacationWorkingDays(updated);
+                            var updated = workingDays.filter(d => d !== dateStr);
+                            AttendanceDB.saveVacationWorkingDays(updated);
                         }
                     } else {
                         if (confirm(`'${dateStr}'은 방학 기간입니다.\n이 날을 '방학 중 출근일'로 지정하시겠습니까?`)) {
                             workingDays.push(dateStr);
-                            await AttendanceDB.saveVacationWorkingDays(workingDays);
+                            AttendanceDB.saveVacationWorkingDays(workingDays);
                         }
                     }
                     renderHolidayCalendar();
                     return;
                 }
 
-                // 일반 날짜인 경우: 기존 휴일 토글 logic
+                // 원본 스냅샷 저장 (첫 변경 시)
+                if (!holidayOriginalSnapshot) {
+                    holidayOriginalSnapshot = JSON.parse(JSON.stringify(HolidayUtil.customHolidays));
+                }
+
+                // 일반 날짜인 경우: 로컬에서만 변경 (서버 저장은 저장버튼으로)
                 if (currentName) {
-                    if (!isCustom) {
+                    if (!isCustom && !holidayPendingChanges.added[dateStr]) {
                         alert(`'${currentName}'은(는) 기본 공휴일이라 수정할 수 없습니다.`);
                         return;
                     }
-                    if (confirm(`'${currentName}'을(를) 휴일 목록에서 삭제하시겠습니까?`)) {
-                        await HolidayUtil.setCustom(dateStr, null);
+                    // 휴일 취소 (로컬)
+                    delete HolidayUtil.customHolidays[dateStr];
+                    // 추적: 원래 있었던 것이면 removed에 기록, 방금 추가한 것이면 added에서 제거
+                    if (holidayPendingChanges.added[dateStr]) {
+                        delete holidayPendingChanges.added[dateStr];
+                    } else {
+                        holidayPendingChanges.removed[dateStr] = currentName;
                     }
                 } else {
-                    const name = prompt('휴일 이름을 입력하세요 (예: 개교기념일, 재량휴업일)', '학교재량휴업일');
-                    if (name) await HolidayUtil.setCustom(dateStr, name);
+                    var name = prompt('휴일 이름을 입력하세요 (예: 개교기념일, 재량휴업일)', '학교재량휴업일');
+                    if (!name) return;
+                    // 휴일 추가 (로컬)
+                    HolidayUtil.customHolidays[dateStr] = name;
+                    // 추적: 원래 삭제했던 것이면 removed에서 제거, 새로 추가한 것이면 added에 기록
+                    if (holidayPendingChanges.removed[dateStr]) {
+                        delete holidayPendingChanges.removed[dateStr];
+                    } else {
+                        holidayPendingChanges.added[dateStr] = name;
+                    }
                 }
+
+                updateHolidayPendingUI();
+                renderHolidayCalendar();
+            }
+
+            function updateHolidayPendingUI() {
+                var addedCount = Object.keys(holidayPendingChanges.added).length;
+                var removedCount = Object.keys(holidayPendingChanges.removed).length;
+                var totalChanges = addedCount + removedCount;
+                var infoBox = document.getElementById('holidayPendingInfo');
+                var textEl = document.getElementById('holidayPendingText');
+                var saveBtn = document.getElementById('holidaySaveBtn');
+                var cancelBtn = document.getElementById('holidayCancelBtn');
+
+                if (totalChanges > 0) {
+                    var parts = [];
+                    if (addedCount > 0) parts.push('추가 ' + addedCount + '건');
+                    if (removedCount > 0) parts.push('취소 ' + removedCount + '건');
+                    textEl.textContent = '변경 대기: ' + parts.join(', ') + ' — 아래 저장 버튼을 눌러 반영하세요.';
+                    infoBox.style.display = 'block';
+                    saveBtn.style.display = 'block';
+                    cancelBtn.style.display = 'block';
+                } else {
+                    infoBox.style.display = 'none';
+                    saveBtn.style.display = 'none';
+                    cancelBtn.style.display = 'none';
+                    holidayOriginalSnapshot = null;
+                }
+            }
+
+            async function saveHolidayChanges() {
+                var addedCount = Object.keys(holidayPendingChanges.added).length;
+                var removedCount = Object.keys(holidayPendingChanges.removed).length;
+
+                var msg = '다음 변경사항을 서버에 저장하시겠습니까?\n';
+                if (addedCount > 0) {
+                    msg += '\n[추가]\n';
+                    for (var d in holidayPendingChanges.added) {
+                        msg += '  - ' + d + ' : ' + holidayPendingChanges.added[d] + '\n';
+                    }
+                }
+                if (removedCount > 0) {
+                    msg += '\n[취소]\n';
+                    for (var d in holidayPendingChanges.removed) {
+                        msg += '  - ' + d + ' : ' + holidayPendingChanges.removed[d] + '\n';
+                    }
+                }
+
+                if (!confirm(msg)) return;
+
+                try {
+                    await HolidayUtil.saveCustom();
+                    alert('휴일 변경사항이 저장되었습니다.');
+                    holidayPendingChanges = { added: {}, removed: {} };
+                    holidayOriginalSnapshot = null;
+                    updateHolidayPendingUI();
+                    renderHolidayCalendar();
+                } catch (e) {
+                    alert('저장 실패: ' + e.message);
+                }
+            }
+
+            function cancelHolidayChanges() {
+                if (!confirm('변경사항을 취소하고 원래 상태로 되돌리시겠습니까?')) return;
+                if (holidayOriginalSnapshot) {
+                    HolidayUtil.customHolidays = JSON.parse(JSON.stringify(holidayOriginalSnapshot));
+                }
+                holidayPendingChanges = { added: {}, removed: {} };
+                holidayOriginalSnapshot = null;
+                updateHolidayPendingUI();
                 renderHolidayCalendar();
             }
 
@@ -1372,10 +1476,22 @@
                     const workingDays = AttendanceDB.getVacationWorkingDays();
                     const isWorkingDay = workingDays.includes(dateStr);
 
+                    var isPendingAdd = !!holidayPendingChanges.added[dateStr];
+                    var isPendingRemove = !!holidayPendingChanges.removed[dateStr];
+
                     if (holidayName) {
                         day.classList.add('holiday');
                         day.classList.add('selected');
-                        day.innerHTML += `<div class="holiday-name">${holidayName}</div>`;
+                        if (isPendingAdd) {
+                            day.style.border = '2px dashed #28a745';
+                            day.innerHTML += `<div class="holiday-name" style="color:#28a745;">+ ${holidayName}</div>`;
+                        } else {
+                            day.innerHTML += `<div class="holiday-name">${holidayName}</div>`;
+                        }
+                    } else if (isPendingRemove) {
+                        day.style.backgroundColor = '#ffe0e0';
+                        day.style.border = '2px dashed #dc3545';
+                        day.innerHTML += `<div style="font-size:0.6rem; color:#dc3545; text-decoration:line-through;">− ${holidayPendingChanges.removed[dateStr]}</div>`;
                     } else if (isVac) {
                         // 방학 기간 표시
                         day.style.backgroundColor = '#d1fae5'; // emerald-100

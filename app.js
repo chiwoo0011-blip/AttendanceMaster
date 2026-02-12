@@ -647,21 +647,19 @@ var HolidayUtil = {
             try {
                 const res = await fetch(`${SERVER_CONFIG.databaseURL}/holidays.json`);
                 const serverData = await res.json();
-                if (serverData) {
-                    // 서버 데이터가 배열일 수도 있으므로 체크 필요
-                    let incoming = serverData;
-                    if (Array.isArray(incoming)) {
-                        const converted = {};
-                        incoming.forEach(d => converted[d] = '지정 휴일');
-                        incoming = converted;
-                    }
-
-                    // 서버 데이터로 완전 교체 (서버가 진실의 원천)
-                    HolidayUtil.customHolidays = incoming;
-
-                    // 로컬 업데이트
-                    localStorage.setItem('custom_holidays', JSON.stringify(incoming));
+                // serverData가 null이면 서버에 휴일이 없음 → 빈 객체로 초기화
+                var incoming = serverData || {};
+                if (Array.isArray(incoming)) {
+                    var converted = {};
+                    incoming.forEach(d => converted[d] = '지정 휴일');
+                    incoming = converted;
                 }
+
+                // 서버 데이터로 완전 교체 (서버가 진실의 원천)
+                HolidayUtil.customHolidays = incoming;
+
+                // 로컬 업데이트
+                localStorage.setItem('custom_holidays', JSON.stringify(incoming));
             } catch (e) {
                 console.error('휴일 데이터 동기화 실패', e);
             }
