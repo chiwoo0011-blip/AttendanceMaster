@@ -1,22 +1,23 @@
-const DB_KEY = 'attendance_data';
-const WORKERS_KEY = 'worker_list';
-const PASSWORD_KEY = 'admin_password';
-const DEFAULT_PASSWORD = '1234';
+// [중복 로드 방지] var를 사용하여 재선언 허용
+var DB_KEY = 'attendance_data';
+var WORKERS_KEY = 'worker_list';
+var PASSWORD_KEY = 'admin_password';
+var DEFAULT_PASSWORD = '1234';
 
 // --- 실제 배포된 인터넷 주소를 여기에 적으세요 (예: https://my-app.github.io) ---
 // 이 주소가 없으면 직원들이 링크를 눌러도 접속할 수 없습니다.
-const GLOBAL_URL = "https://attendance-master-3138.vercel.app";
+var GLOBAL_URL = "https://attendance-master-3138.vercel.app";
 
 // --- 서버 설정 (Firebase 연동용) ---
 // 실제 사용 시 Firebase 설정을 여기에 붙여넣으세요.
 // (설정 방법은 잠시 후 안내해 드리겠습니다.)
-const SERVER_CONFIG = {
+var SERVER_CONFIG = {
     useServer: true, // true로 바꾸면 서버와 연동됩니다.
     databaseURL: "https://yrs-workingdaycheck-default-rtdb.firebaseio.com/"
 };
 
 // --- [v2.0.0] 회기년도(Fiscal Year) 유틸리티 (3월 1일 ~ 익년 2월 말일) ---
-const FiscalYearUtil = {
+var FiscalYearUtil = {
     getCurrentYear: () => {
         const now = new Date();
         const year = now.getFullYear();
@@ -53,7 +54,7 @@ const ImageUtil = {
     }
 };
 
-const AttendanceDB = {
+var AttendanceDB = {
     getAll: () => {
         try {
             const data = JSON.parse(localStorage.getItem(DB_KEY) || '[]');
@@ -575,7 +576,7 @@ const AttendanceDB = {
     }
 };
 
-const HolidayUtil = {
+var HolidayUtil = {
     // 양력 고정 휴일
     fixedHolidays: {
         '01-01': '신정',
@@ -718,7 +719,7 @@ const HolidayUtil = {
 HolidayUtil.init();
 
 // --- [v1.8.9] 오디오 알림 유틸리티 (Web Audio API 기반) ---
-const AudioUtil = {
+var AudioUtil = {
     ctx: null,
 
     init: () => {
@@ -766,7 +767,7 @@ const AudioUtil = {
 };
 
 // --- [v1.9.0] Excel 처리 유틸리티 (xlsx 라이브러리 필요) ---
-const ExcelUtil = {
+var ExcelUtil = {
     // 1. 직원 명단 Excel 내보내기 (다운로드)
     exportWorkers: () => {
         try {
