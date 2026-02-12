@@ -35,7 +35,7 @@ var FiscalYearUtil = {
 };
 
 // --- [v2.0.0] 이미지 압축 유틸리티 ---
-const ImageUtil = {
+var ImageUtil = {
     compressSignature: (dataUrl, quality = 0.5) => {
         return new Promise((resolve) => {
             const img = new Image();
@@ -910,7 +910,7 @@ var ExcelUtil = {
         }
     }
 };
-const AutoBackupSystem = {
+var AutoBackupSystem = {
     // 회기 변경 감지 및 알림
     checkSeasonChange: () => {
         const lastCheck = localStorage.getItem('last_backup_check_date');
