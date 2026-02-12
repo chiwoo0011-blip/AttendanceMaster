@@ -434,6 +434,11 @@
                 // 개인 알림 로드
                 loadNotifications(worker.name);
             }
+
+            // 최신 휴일 데이터 동기화 후 달력 렌더링
+            if (SERVER_CONFIG.useServer) {
+                await HolidayUtil.init();
+            }
             renderWorkerCalendar();
         }
 

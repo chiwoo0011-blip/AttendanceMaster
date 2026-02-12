@@ -642,14 +642,13 @@ var HolidayUtil = {
         }
         HolidayUtil.customHolidays = local;
 
-        // 2. 서버 로드 (병합)
+        // 2. 서버 로드 (서버 데이터를 신뢰하여 완전 교체)
         if (SERVER_CONFIG.useServer) {
             try {
                 const res = await fetch(`${SERVER_CONFIG.databaseURL}/holidays.json`);
                 const serverData = await res.json();
                 if (serverData) {
-                    // 서버 데이터 병합 (서버 데이터 우선 혹은 병합 전략)
-                    // 여기서는 서버 데이터가 배열일 수도 있으므로 체크 필요
+                    // 서버 데이터가 배열일 수도 있으므로 체크 필요
                     let incoming = serverData;
                     if (Array.isArray(incoming)) {
                         const converted = {};
@@ -657,11 +656,11 @@ var HolidayUtil = {
                         incoming = converted;
                     }
 
-                    // 병합 (로컬 + 서버)
-                    HolidayUtil.customHolidays = { ...HolidayUtil.customHolidays, ...incoming };
+                    // 서버 데이터로 완전 교체 (서버가 진실의 원천)
+                    HolidayUtil.customHolidays = incoming;
 
                     // 로컬 업데이트
-                    localStorage.setItem('custom_holidays', JSON.stringify(HolidayUtil.customHolidays));
+                    localStorage.setItem('custom_holidays', JSON.stringify(incoming));
                 }
             } catch (e) {
                 console.error('휴일 데이터 동기화 실패', e);
