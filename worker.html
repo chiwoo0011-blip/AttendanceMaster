@@ -314,11 +314,17 @@
             updateSoundUI();
             lucide.createIcons();
 
-            // PWA Service Worker 등록
+            // PWA Service Worker: 이전 캐시 강제 삭제 후 재등록
             if ('serviceWorker' in navigator) {
                 try {
-                    await navigator.serviceWorker.register('/service-worker.js');
-                    console.log('Service Worker registered');
+                    // 이전 캐시 모두 삭제
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map(name => caches.delete(name)));
+
+                    // 새 Service Worker 등록 (네트워크 우선 전략)
+                    const reg = await navigator.serviceWorker.register('/service-worker.js');
+                    if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    console.log('Service Worker registered (network-first)');
                 } catch (error) {
                     console.error('Service Worker registration failed:', error);
                 }
