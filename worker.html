@@ -4,6 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>출근 확인 - 근태관리 시스템</title>
 
     <!-- PWA Meta Tags -->
@@ -14,7 +17,7 @@
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3652/3652191.png">
 
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=4">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -142,7 +145,7 @@
 
         <main class="glass fade-in" style="padding: 1.5rem;">
             <!-- 1. 성명 입력 및 정보 카드 표시 -->
-            <div class="input-group">
+            <div class="input-group" id="loginSection">
                 <label for="workerName">정보 입력</label>
                 <div style="display: flex; gap: 0.5rem;">
                     <div style="flex: 7; display: flex; flex-direction: column; gap: 0.5rem;">
@@ -157,16 +160,43 @@
                         <i data-lucide="search"></i> 조회
                     </button>
                 </div>
-                <!-- 신규 등록 신청 링크 -->
-                <div style="text-align: right; margin-top: 0.5rem;">
-                    <span style="font-size: 0.85rem; color: var(--text-muted);">아직 등록되지 않으셨나요? </span>
-                    <a href="#" onclick="openRegisterModal()"
-                        style="font-size: 0.85rem; color: var(--primary); font-weight: 600; text-decoration: underline;">신규
-                        등록 신청</a>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.85rem; color: var(--text-muted);">
+                        <input type="checkbox" id="rememberMe" style="width: 16px; height: 16px; accent-color: var(--primary);">
+                        이 기기에서 기억하기
+                    </label>
+                    <div>
+                        <span style="font-size: 0.85rem; color: var(--text-muted);">아직 등록되지 않으셨나요? </span>
+                        <a href="#" onclick="openRegisterModal()"
+                            style="font-size: 0.85rem; color: var(--primary); font-weight: 600; text-decoration: underline;">신규
+                            등록 신청</a>
+                    </div>
                 </div>
-                <!-- 근무형태 카드가 동적으로 들어갑니다 -->
-                <div id="workerInfoArea"></div>
             </div>
+
+            <!-- 기억하기로 로그인된 상태 -->
+            <div class="input-group" id="loggedInSection" style="display: none;">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="user-check" style="width: 20px; color: #4ade80;"></i>
+                        <span style="font-weight: 700; color: var(--text);"><span id="loggedInName"></span>님</span>
+                    </div>
+                    <div style="display: flex; gap: 0.4rem;">
+                        <button onclick="refreshWorkerInfo()" class="btn btn-primary" style="padding: 0.4rem 0.7rem; font-size: 0.8rem;">
+                            <i data-lucide="refresh-cw" style="width: 14px;"></i> 새로고침
+                        </button>
+                        <button onclick="switchUser()" class="btn btn-secondary" style="padding: 0.4rem 0.7rem; font-size: 0.8rem;">
+                            <i data-lucide="users" style="width: 14px;"></i> 다른 사람
+                        </button>
+                        <button onclick="logoutWorker()" style="padding: 0.4rem 0.7rem; font-size: 0.8rem; background: none; border: 1px solid #ef4444; color: #ef4444; border-radius: 6px; cursor: pointer;">
+                            <i data-lucide="log-out" style="width: 14px;"></i> 로그아웃
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 근무형태 카드 (공통 영역) -->
+            <div id="workerInfoArea"></div>
 
             <!-- 출근 입력 버튼 -->
             <button class="btn btn-primary" id="toggleAttendanceBtn" onclick="toggleAttendanceSection()"
@@ -253,7 +283,7 @@
         }
     </script>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=4"></script>
     <script>
         lucide.createIcons();
         const monthInput = document.getElementById('workMonth');
@@ -284,7 +314,70 @@
 
             // Firebase Cloud Messaging 초기화
             initializeFirebaseMessaging();
+
+            // 기억하기 자동 조회
+            const saved = localStorage.getItem('remembered_worker');
+            if (saved) {
+                try {
+                    const { name, phoneBack } = JSON.parse(saved);
+                    if (name && phoneBack) {
+                        document.getElementById('workerName').value = name;
+                        document.getElementById('workerPhoneBack').value = phoneBack;
+                        document.getElementById('rememberMe').checked = true;
+                        await fetchWorkerInfo();
+                    }
+                } catch (e) {
+                    localStorage.removeItem('remembered_worker');
+                }
+            }
+
+            // 5분마다 자동 동기화 (공지, 휴일, 알림)
+            setInterval(async () => {
+                if (!SERVER_CONFIG.useServer) return;
+                try {
+                    await AttendanceDB.syncSettingsWithServer();
+                    renderNotice();
+                    await HolidayUtil.init();
+                    const workerName = document.getElementById('workerName').value.trim();
+                    if (workerName) {
+                        await loadNotifications(workerName);
+                    }
+                } catch (e) {
+                    console.error('자동 동기화 실패:', e);
+                }
+            }, 5 * 60 * 1000);
         });
+
+        // 새로고침: 저장된 정보로 서버 재조회
+        async function refreshWorkerInfo() {
+            if (SERVER_CONFIG.useServer) {
+                await AttendanceDB.syncSettingsWithServer();
+                await AttendanceDB.syncWorkersWithServer();
+                await HolidayUtil.init();
+            }
+            renderNotice();
+            await fetchWorkerInfo();
+            lucide.createIcons();
+        }
+
+        // 다른 사람으로 전환: 입력 화면 표시 (기억 유지)
+        function switchUser() {
+            document.getElementById('loggedInSection').style.display = 'none';
+            document.getElementById('loginSection').style.display = 'block';
+            document.getElementById('workerName').value = '';
+            document.getElementById('workerPhoneBack').value = '';
+            document.getElementById('workerInfoArea').innerHTML = '';
+            document.getElementById('toggleAttendanceBtn').style.display = 'none';
+            document.getElementById('personalNotificationsContainer').style.display = 'none';
+            document.getElementById('rememberMe').checked = false;
+            currentWorkerRule = null;
+        }
+
+        // 로그아웃: 기억 삭제 + 입력 화면
+        function logoutWorker() {
+            localStorage.removeItem('remembered_worker');
+            switchUser();
+        }
 
         // 공지사항 렌더링
         function renderNotice() {
@@ -433,6 +526,16 @@
                 }
                 // 개인 알림 로드
                 loadNotifications(worker.name);
+
+                // 기억하기 처리
+                if (document.getElementById('rememberMe').checked) {
+                    localStorage.setItem('remembered_worker', JSON.stringify({ name, phoneBack }));
+                }
+
+                // 조회 성공 시 버튼 영역 표시
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('loggedInSection').style.display = 'block';
+                document.getElementById('loggedInName').textContent = worker.name;
             }
 
             // 최신 휴일 데이터 동기화 후 달력 렌더링
