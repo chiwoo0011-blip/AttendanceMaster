@@ -296,7 +296,8 @@
                 noticeContainer.style.display = 'block';
                 content.innerHTML = notice.replace(/\n/g, '<br>');
             } else {
-                noticeContainer.style.display = 'none';
+                noticeContainer.style.display = 'block';
+                content.innerHTML = '<span style="color: var(--text-muted); font-style: italic;">공지가 있으면 알려드립니다.</span>';
             }
         }
 
@@ -747,11 +748,14 @@
             if (birth.length !== 6) return alert('생년월일 6자리를 정확히 입력하세요.');
             if (!phone) return alert('휴대폰 번호를 입력하세요.');
 
-
-
             if (!confirm(`${name}님, 등록을 신청하시겠습니까?\n(관리자 승인 후 이용 가능합니다)`)) return;
 
             try {
+                // 서버와 동기화하여 최신 대기 명단 확인 (거절된 신청이 있을 수 있음)
+                if (SERVER_CONFIG.useServer) {
+                    await AttendanceDB.syncPendingWithServer();
+                }
+
                 await AttendanceDB.savePendingWorker({
                     name: name,
                     birth: birth,
