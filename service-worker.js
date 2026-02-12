@@ -1,5 +1,5 @@
 // Service Worker for PWA - Caching and Offline Support
-const CACHE_NAME = 'attendance-app-v2';
+const CACHE_NAME = 'attendance-app-v3';
 const urlsToCache = [
     '/worker.html',
     '/app.js',
