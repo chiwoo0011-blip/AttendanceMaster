@@ -2,19 +2,25 @@ const admin = require('firebase-admin');
 
 // Firebase Admin 초기화 (Vercel serverless 환경에서 재사용)
 if (!admin.apps.length) {
-    admin.initializeApp({
-        credential: admin.credential.cert({
-            projectId: process.env.FIREBASE_PROJECT_ID,
-            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-        }),
-        databaseURL: process.env.FIREBASE_DATABASE_URL
-    });
+    const { FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIREBASE_DATABASE_URL } = process.env;
+
+    if (!FIREBASE_PROJECT_ID || !FIREBASE_CLIENT_EMAIL || !FIREBASE_PRIVATE_KEY || !FIREBASE_DATABASE_URL) {
+        console.error('Firebase 환경변수가 설정되지 않았습니다. Vercel 환경변수를 확인하세요.');
+    } else {
+        admin.initializeApp({
+            credential: admin.credential.cert({
+                projectId: FIREBASE_PROJECT_ID,
+                clientEmail: FIREBASE_CLIENT_EMAIL,
+                privateKey: FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+            }),
+            databaseURL: FIREBASE_DATABASE_URL
+        });
+    }
 }
 
 module.exports = async (req, res) => {
     // CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -24,6 +30,10 @@ module.exports = async (req, res) => {
 
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    if (!admin.apps.length) {
+        return res.status(500).json({ error: 'Firebase not initialized. Check environment variables.' });
     }
 
     const { title, body, workerNames } = req.body;

@@ -167,15 +167,13 @@
         </div>
     </div>
 
-    <!-- Load app.js FIRST so AttendanceDB is available -->
-    <script src="app.js?v=5"></script>
-
     <script>
         function checkAdminLogin() {
             const password = document.getElementById('adminPasswordInput').value;
             const savedPassword = AttendanceDB.getPassword();
 
             if (password === savedPassword) {
+                sessionStorage.setItem('admin_authenticated', 'true');
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('adminContent').style.display = 'block';
                 refreshAppTitles();
@@ -238,15 +236,14 @@
             refreshAppTitles();
 
             // URL 파라미터로 탭 직접 이동 (notifications.html 등에서 돌아올 때)
+            // 보안: 세션 내 인증된 경우에만 허용
             const urlParams = new URLSearchParams(window.location.search);
             const targetTab = urlParams.get('tab');
-            if (targetTab) {
-                // 비밀번호 화면 건너뛰고 바로 대시보드 표시
+            if (targetTab && sessionStorage.getItem('admin_authenticated') === 'true') {
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('adminContent').style.display = 'block';
                 lucide.createIcons();
                 resetInactivityTimer();
-                // 해당 탭으로 이동
                 const navLinks = document.querySelectorAll('.nav-link');
                 let targetNavItem = null;
                 navLinks.forEach(link => {
@@ -268,8 +265,8 @@
                 renderPendingWorkers();
             } catch (e) { console.error("Pending sync failed", e); }
 
-            // 2. 출근부 데이터 동기화
-            const y = new Date().getFullYear();
+            // 2. 출근부 데이터 동기화 (회기년도 기준 - 1~2월은 이전 연도)
+            const y = FiscalYearUtil.getCurrentYear();
             try {
                 const res = await fetch(`${SERVER_CONFIG.databaseURL}/records/${y}.json`);
                 if (res.ok) {
@@ -767,173 +764,6 @@
                         </div>
                     </div>
 
-                    <div style="margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border);">
-                        <h3>출근부 제출 기한 설정</h3>
-                        <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:1rem;">직원들에게 보낼 안내 문구에 포함될 제출
-                            기한을 설정합니다.</p>
-                        <div style="display:flex; gap:0.5rem; align-items:stretch;">
-                            <input type="text" id="deadlineInput" placeholder="예: 매월 5일" class="btn btn-secondary"
-                                style="flex:1; text-align:left; cursor:text; color: var(--primary); font-size: 1.2rem; font-weight: 800; border: 2px solid var(--primary); background: #f8fafc; padding: 0.8rem 1rem;">
-                            <button class="btn btn-primary" onclick="updateDeadline()" style="min-width:120px;">기한
-                                설정</button>
-                        </div>
-                    </div>
-
-                    <script>
-                        // Settings update functions
-                        function updateAppTitle() {
-                            const input = document.getElementById('appTitleInput');
-                            const value = input.value.trim();
-                            if (!value) return alert('앱 이름을 입력하세요.');
-                            AttendanceDB.saveAppTitle(value);
-                            refreshAppTitles();
-                            AudioUtil.playSuccess();
-                            alert('앱 이름이 변경되었습니다!');
-                        }
-                        function updateAutoLogoutTime() {
-                            const minutes = parseInt(document.getElementById('autoLogoutInput').value);
-                            if (isNaN(minutes) || minutes < 0) return alert('올바른 숫자를 입력하세요.');
-                            AttendanceDB.saveAutoLogoutTime(minutes);
-                            AudioUtil.playSuccess();
-                            alert(`자동 로그아웃 시간이 ${minutes}분으로 설정되었습니다!`);
-                        }
-
-                        function updateDeadline() {
-                            const deadline = document.getElementById('deadlineInput').value.trim();
-                            if (!deadline) return alert('제출 기한을 입력하세요.');
-                            AttendanceDB.saveDeadline(deadline);
-                            AudioUtil.playSuccess();
-                            alert('제출 기한이 설정되었습니다!');
-                        }
-
-                        function updateAppLogo(input) {
-                            const file = input.files[0];
-                            if (!file) return;
-                            if (!file.type.startsWith('image/')) return alert('이미지 파일만 선택할 수 있습니다.');
-
-                            const reader = new FileReader();
-                            reader.onload = (e) => {
-                                const logoData = e.target.result;
-                                AttendanceDB.saveAppLogo(logoData);
-                                document.getElementById('logoPreview').innerHTML = `<img src="${logoData}" class="logo-img">`;
-                                refreshAppTitles();
-                                AudioUtil.playSuccess();
-                                alert('로고가 변경되었습니다!');
-                            };
-                            reader.readAsDataURL(file);
-                        }
-
-                        function resetAppLogo() {
-                            if (!confirm('로고를 초기화하시겠습니까')) return;
-                            AttendanceDB.saveAppLogo('');
-                            document.getElementById('logoPreview').innerHTML = '<i data-lucide="image" style="color:#ccc;"></i>';
-                            refreshAppTitles();
-                            AudioUtil.playSuccess();
-                            alert('로고가 초기화되었습니다!');
-                        }
-
-                        function updateNotice() {
-                            const notice = document.getElementById('noticeTextArea').value.trim();
-                            AttendanceDB.saveNotice(notice);
-                            AudioUtil.playSuccess();
-                            alert('공지사항이 저장되었습니다!');
-                        }
-
-                        function loadNotice() {
-                            const notice = AttendanceDB.getNotice();
-                            const textarea = document.getElementById('noticeTextArea');
-                            if (textarea) textarea.value = notice;
-                        }
-
-                        function loadSettingsUI() {
-                            // Load current settings into UI
-                            const appTitle = AttendanceDB.getAppTitle();
-                            const autoLogout = AttendanceDB.getAutoLogoutTime();
-                            const deadline = AttendanceDB.getDeadline();
-                            const logo = AttendanceDB.getAppLogo();
-
-                            const appTitleInput = document.getElementById('appTitleInput');
-                            const autoLogoutInput = document.getElementById('autoLogoutInput');
-                            const deadlineInput = document.getElementById('deadlineInput');
-                            const logoPreview = document.getElementById('logoPreview');
-
-                            if (appTitleInput) appTitleInput.value = appTitle;
-                            if (autoLogoutInput) autoLogoutInput.value = autoLogout;
-                            if (deadlineInput) deadlineInput.value = deadline;
-                            if (logoPreview && logo) {
-                                logoPreview.innerHTML = `<img src="${logo}" class="logo-img">`;
-                            }
-                        }
-
-                        // Load settings when page loads
-                        window.addEventListener('DOMContentLoaded', () => {
-                            loadSettingsUI();
-                        });
-
-                        // Factory Reset - Complete system reset
-                        async function factoryReset() {
-                            const confirmText = `⚠️ 완전 초기화를 실행하시겊습니까?\n\n삭제되는 내용:\n- 모든 출근 기록\n- 인원 명단\n- 설정 (앱 이름, 로고 등)\n- 휴일 정보\n\n서버 데이터도 모두 삭제됩니다.`;
-
-                            if (!confirm(confirmText)) return;
-
-                            // 2차 확인
-                            const finalConfirm = prompt('정말로 모든 데이터를 삭제하시려면\n"완전삭제" 라고 입력하세요:');
-                            if (finalConfirm !== '완전삭제') {
-                                alert('취소되었습니다.');
-                                return;
-                            }
-
-                            try {
-                                // 1. localStorage 완전 삭제
-                                localStorage.clear();
-
-                                // 2. 서버 데이터 삭제 (Firebase)
-                                if (SERVER_CONFIG.useServer && SERVER_CONFIG.databaseURL) {
-                                    const fy = FiscalYearUtil.getCurrentYear();
-
-                                    // 출근 기록 삭제
-                                    await fetch(`${SERVER_CONFIG.databaseURL}/records/${fy}.json`, { method: 'DELETE' });
-
-                                    // 인원 명단 삭제
-                                    await fetch(`${SERVER_CONFIG.databaseURL}/workers.json`, { method: 'DELETE' });
-
-                                    // 대기 인원 삭제
-                                    await fetch(`${SERVER_CONFIG.databaseURL}/pending_workers.json`, { method: 'DELETE' });
-
-                                    // 설정 삭제
-                                    await fetch(`${SERVER_CONFIG.databaseURL}/settings.json`, { method: 'DELETE' });
-
-                                    // 휴일 설정 삭제
-                                    await fetch(`${SERVER_CONFIG.databaseURL}/holidays.json`, { method: 'DELETE' });
-                                }
-
-                                alert('✅ 완전 초기화가 완료되었습니다.\n\n페이지를 새로고침합니다.');
-
-                                // 페이지 새로고침
-                                window.location.reload();
-
-                            } catch (e) {
-                                console.error('완전 초기화 실패:', e);
-                                alert('⚠️ 초기화 중 오류가 발생했습니다.\n일부 데이터가 남아있을 수 있습니다.');
-                            }
-                        }
-
-                        // Local Records Clear - Clear only local attendance records
-                        function clearLocalRecords() {
-                            if (!confirm('현재 PC에 저장된 출근 기록을 삭제하시겠습니까?\n\n서버 데이터와 설정, 인원명단은 유지됩니다.')) return;
-
-                            try {
-                                const fy = FiscalYearUtil.getCurrentYear();
-                                localStorage.removeItem(`attendance_records_${fy}`);
-                                AudioUtil.playSuccess();
-                                alert('로컬 출근 기록이 삭제되었습니다.');
-                                location.reload();
-                            } catch (e) {
-                                console.error('로컬 초기화 실패:', e);
-                                alert('⚠️ 초기화 중 오류가 발생했습니다.');
-                            }
-                        }
-                    </script>
 
                     <div style="margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border);">
                         <h3>방학 기간 설정 (v1.7)</h3>
@@ -1025,7 +855,7 @@
                                     <!-- JS로 0000년 표시 -->
                                 </div>
                             </div>
-                            <button class="btn btn-primary" onclick="confirmManualArchive()" style="width: 100%;">
+                            <button class="btn btn-primary" onclick="confirmManualArchive(event)" style="width: 100%;">
                                 <i data-lucide="save"></i> 데이터 백업 및 앱 최적화 (Archive)
                             </button>
                         </div>
@@ -1221,8 +1051,6 @@
             </div>
         </div>
 
-        <div id="printSection" class="print-only"></div>
-
         <script>
             lucide.createIcons();
 
@@ -1261,8 +1089,10 @@
                 if (id === 'annualView') renderAnnualTable();
                 if (id === 'noticeView') loadNotice(); // [v2.2.0] 공지사항 로드
                 if (id === 'settingsView') {
+                    document.getElementById('appTitleInput').value = AttendanceDB.getAppTitle();
                     document.getElementById('autoLogoutInput').value = AttendanceDB.getAutoLogoutTime();
-                    document.getElementById('deadlineInput').value = AttendanceDB.getDeadline();
+                    const logo = AttendanceDB.getAppLogo();
+                    if (logo) document.getElementById('logoPreview').innerHTML = `<img src="${logo}" class="logo-img">`;
 
                     // 방학 설정 로드 (v1.7)
                     const v = AttendanceDB.getVacations();
@@ -1291,6 +1121,7 @@
             }
 
             function logoutAdmin() {
+                sessionStorage.removeItem('admin_authenticated');
                 document.getElementById('adminContent').style.display = 'none';
                 document.getElementById('loginScreen').style.display = 'flex';
                 document.getElementById('adminPasswordInput').value = '';
@@ -1651,9 +1482,8 @@
                 const year = now.getFullYear();
                 const month = now.getMonth() + 1;
                 const date = now.getDate();
-                const deadline = AttendanceDB.getDeadline();
 
-                const msg = `[근태관리 안내]\n\n${year}년 ${month}월분 출근부 작성을 부탁드립니다.\n\n- 보내는 일자: ${year}.${month}.${date}\n- 제출 기한: ${deadline}까지\n\n아래 주소로 접속하여 본인 성명 입력 후 서명해 주세요.\n${getWorkerUrl()}`;
+                const msg = `[근태관리 안내]\n\n${year}년 ${month}월분 출근부 작성을 부탁드립니다.\n\n- 보내는 일자: ${year}.${month}.${date}\n\n아래 주소로 접속하여 본인 성명 입력 후 서명해 주세요.\n${getWorkerUrl()}`;
 
                 try {
                     await navigator.clipboard.writeText(msg);
@@ -1667,7 +1497,8 @@
             function getWorkerUrl() {
                 let base = typeof GLOBAL_URL !== 'undefined' && GLOBAL_URL ? GLOBAL_URL : window.location.href.replace('admin.html', '');
                 if (!base.endsWith('/')) base += '/';
-                return `${base}worker.html`;
+                // 카카오톡 등 인앱 브라우저 캐시 방지: 타임스탬프 쿼리 파라미터 추가
+                return `${base}worker.html?t=${Date.now()}`;
             }
 
             async function requestAttendance(name, phone) {
@@ -1918,7 +1749,7 @@
                 }
             }
 
-            function deleteWorker(id) { if (confirm('정말 삭제하시겠습니까?')) { AttendanceDB.deleteWorker(id); renderWorkerTable(); } }
+            async function deleteWorker(id) { if (confirm('정말 삭제하시겠습니까?')) { await AttendanceDB.deleteWorker(id); renderWorkerTable(); } }
 
             // [v2.5.3] 선택 인원 일괄 삭제
             async function deleteSelectedWorkers() {
@@ -1991,13 +1822,6 @@
 
             async function clearAllRecords() { if (confirm('모든 출근 기록을 삭제할까요?')) { await AttendanceDB.clear(); alert('삭제되었습니다.'); renderAggregatedTable(); } }
             async function clearAllWorkersData() { if (confirm('모든 인원 명단을 삭제할까요?')) { await AttendanceDB.clearWorkers(); alert('삭제되었습니다.'); renderWorkerTable(); } }
-
-            function updateDeadline() {
-                const val = document.getElementById('deadlineInput').value.trim();
-                if (!val) return alert('제출 기한을 입력하세요.');
-                AttendanceDB.saveDeadline(val);
-                alert('제출 기한이 설정되었습니다.');
-            }
 
             // 방학 설정 저장 (v1.7)
             function updateVacationSettings() {
@@ -2348,18 +2172,18 @@
                 }
             }
             // [v2.0.0] 매뉴얼 아카이빙 실행
-            async function confirmManualArchive() {
+            async function confirmManualArchive(e) {
                 if (!confirm('현재 저장된 데이터를 백업하고 "회기 아카이빙"을 진행하시겠습니까?\n\n[작업 내용]\n1. 전체 출근기록 엑셀 다운로드\n2. 로컬 저장소 초기화\n3. 중요 설정 및 명단 유지')) return;
 
+                const btn = e ? e.target.closest('button') : null;
                 try {
-                    const btn = event.target.closest('button');
                     if (btn) btn.innerText = '백업 및 초기화 진행 중...';
 
                     await AutoBackupSystem.performArchive();
                     alert('아카이빙이 완료되었습니다.\n앱이 최적화되었습니다.');
                     location.reload();
-                } catch (e) {
-                    console.error(e);
+                } catch (err) {
+                    console.error(err);
                     alert('아카이빙 중 오류가 발생했습니다.');
                     if (btn) btn.innerText = '데이터 백업 및 앱 최적화 (Archive)';
                 }
@@ -2391,7 +2215,7 @@
             });
         </script>
     </div> <!-- End of #adminContent -->
-    <div id="printSection"></div>
+    <div id="printSection" class="print-only"></div>
 </body>
 
 </html>

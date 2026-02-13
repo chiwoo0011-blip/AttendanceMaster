@@ -19,9 +19,14 @@ self.addEventListener('install', (event) => {
 
 // 실행 시 네트워크 우선 전략
 self.addEventListener('fetch', (event) => {
+    // HTML 파일: 쿼리 파라미터(?t=xxx) 제거하여 캐시 키 통일
+    const url = new URL(event.request.url);
+    const isHTML = url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname === '';
+    const cacheKey = isHTML ? new Request(url.origin + url.pathname) : event.request;
+
     event.respondWith(
         fetch(event.request).catch(() => {
-            return caches.match(event.request);
+            return caches.match(cacheKey);
         })
     );
 });

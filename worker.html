@@ -7,6 +7,20 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+
+    <!-- 카카오톡 등 인앱 브라우저 캐시 강제 무력화 -->
+    <script>
+    (function() {
+        var url = new URL(window.location.href);
+        var t = url.searchParams.get('t');
+        // 타임스탬프가 없거나 1시간(3600초) 이상 지난 경우 새로고침
+        if (!t || (Date.now() - parseInt(t)) > 3600000) {
+            url.searchParams.set('t', Date.now());
+            window.location.replace(url.href);
+        }
+    })();
+    </script>
+
     <title>출근 확인 - 근태관리 시스템</title>
 
     <!-- PWA Meta Tags -->
